@@ -15,6 +15,12 @@ vi.mock('@azeth/sdk', () => ({
 // Prevent dotenv from loading .env files during tests
 vi.mock('dotenv', () => ({ default: { config: vi.fn() } }));
 
+// Mock key-persistence so tests don't read the real ~/.azeth/key
+vi.mock('../../src/utils/key-persistence.js', () => ({
+  loadKey: vi.fn().mockReturnValue(null),
+  saveKey: vi.fn().mockReturnValue(true),
+}));
+
 /** Build a Commander tree that mirrors the real CLI's global options
  *  so that optsWithGlobals() works correctly in resolveOptions().
  *
@@ -48,7 +54,7 @@ describe('resolveOptions', () => {
 
   beforeEach(() => {
     // Snapshot env vars we might mutate
-    for (const key of ['AZETH_CHAIN', 'AZETH_PRIVATE_KEY', 'BASE_RPC_URL', 'AZETH_SERVER_URL']) {
+    for (const key of ['AZETH_CHAIN', 'AZETH_PRIVATE_KEY', 'AZETH_RPC_URL_BASE_SEPOLIA', 'AZETH_SERVER_URL']) {
       savedEnv[key] = process.env[key];
       delete process.env[key];
     }
@@ -121,8 +127,8 @@ describe('resolveOptions', () => {
     expect((opts as Record<string, unknown>)['privateKey']).toBeUndefined();
   });
 
-  it('reads rpc URL from env var', () => {
-    process.env['BASE_RPC_URL'] = 'https://custom-rpc.example.com';
+  it('reads rpc URL from per-chain env var', () => {
+    process.env['AZETH_RPC_URL_BASE_SEPOLIA'] = 'https://custom-rpc.example.com';
     const sub = buildProgram();
     const opts = resolveOptions(sub);
 
@@ -179,7 +185,7 @@ describe('createKit', () => {
     };
 
     await expect(createKit(options)).rejects.toThrow(
-      'Private key required. Set the AZETH_PRIVATE_KEY environment variable.',
+      'Private key required.',
     );
   });
 

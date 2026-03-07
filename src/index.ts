@@ -16,7 +16,7 @@ const program = new Command()
   .description('Azeth.ai CLI — Trust Infrastructure for the Machine Economy')
   .version('0.1.0')
   .option('--chain <chain>', 'Chain to use (base|baseSepolia|ethereumSepolia|ethereum)', 'baseSepolia')
-  .option('--rpc-url <url>', 'RPC URL (or set BASE_RPC_URL)')
+  .option('--rpc-url <url>', 'RPC URL (or set AZETH_RPC_URL_BASE_SEPOLIA, etc.)')
   .option('--server-url <url>', 'Azeth server URL (or set AZETH_SERVER_URL)');
 
 // Daily porcelain commands

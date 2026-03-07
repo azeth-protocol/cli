@@ -5,6 +5,7 @@ import { generatePrivateKey, privateKeyToAccount } from 'viem/accounts';
 import { AzethKit, type AzethKitConfig } from '@azeth/sdk';
 import { isValidChainName, TOKENS, type Guardrails, type SupportedChainName } from '@azeth/common';
 import { printHeader, printField, printSuccess, printError } from '../utils/display.js';
+import { saveKey } from '../utils/key-persistence.js';
 
 const DEFAULT_SERVER_URL = 'https://api.azeth.ai';
 
@@ -62,6 +63,7 @@ export const quickstartCommand = new Command('quickstart')
       } else {
         privateKey = generatePrivateKey();
         generated = true;
+        saveKey(privateKey);
       }
 
       const account = privateKeyToAccount(privateKey);
@@ -83,13 +85,16 @@ export const quickstartCommand = new Command('quickstart')
       }
 
       // Step 4: Build AzethKitConfig directly (no env vars required)
+      const serverUrl = process.env['AZETH_SERVER_URL'] ?? DEFAULT_SERVER_URL;
       const config: AzethKitConfig = {
         privateKey,
         chain,
-        serverUrl: process.env['AZETH_SERVER_URL'] ?? DEFAULT_SERVER_URL,
+        serverUrl,
       };
 
-      const spinner = ora(`Deploying smart account on ${chain} (gas sponsored by Azeth)...`).start();
+      // SDK auto-tries gasless relay (createAccountWithSignature) before falling back
+      // to direct on-chain tx. No need to sponsor gas separately.
+      const spinner = ora(`Deploying smart account on ${chain}...`).start();
       kit = await AzethKit.create(config);
 
       // Step 5: Deploy smart account + register on ERC-8004
@@ -127,7 +132,6 @@ export const quickstartCommand = new Command('quickstart')
       spinner.stop();
 
       // Step 6: Print results
-      const serverUrl = config.serverUrl ?? DEFAULT_SERVER_URL;
       const tokenIdStr = result.tokenId.toString();
       const badgeUrl = `${serverUrl}/badge/${tokenIdStr}`;
       const profileUrl = `https://azeth.ai/agent/${result.account}`;
@@ -142,38 +146,10 @@ export const quickstartCommand = new Command('quickstart')
       printField('Profile', profileUrl);
       printField('Badge', badgeUrl);
       console.log();
-      printSuccess('Gas sponsored by Azeth testnet — no ETH required.');
+      printSuccess('Account deployed — zero gas required from you.');
       console.log();
 
-      // Step 6b: Fund the smart account with testnet USDC via faucet (testnet only)
-      if (isTestnet) {
-        try {
-          const faucetSpinner = ora('Funding account with testnet USDC...').start();
-          const faucetRes = await fetch(`${serverUrl}/api/v1/faucet`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ address: result.account }),
-            signal: AbortSignal.timeout(60_000),
-          });
-          if (faucetRes.ok) {
-            const faucetBody = await faucetRes.json() as { data?: { amount?: string; txHash?: string } };
-            faucetSpinner.stop();
-            printSuccess(`Funded with ${faucetBody.data?.amount ?? '1.00 USDC'} for demo calls.`);
-            console.log();
-          } else {
-            faucetSpinner.stop();
-            // Non-fatal: show manual funding instructions
-            console.log(chalk.gray('  Faucet unavailable — send testnet USDC to your smart account to try paid services.'));
-            console.log();
-          }
-        } catch {
-          // Non-fatal — faucet unreachable
-          console.log(chalk.gray('  Could not reach faucet — send testnet USDC to your smart account to try paid services.'));
-          console.log();
-        }
-      }
-
-      // Step 6c: Demo the live ecosystem — call the free catalog
+      // Step 6b: Demo the live ecosystem — call the free catalog
       const catalogUrl = `${serverUrl}/api/v1/pricing`;
       try {
         const catalogSpinner = ora('Discovering live services...').start();
@@ -190,15 +166,32 @@ export const quickstartCommand = new Command('quickstart')
               console.log(`  ${chalk.cyan(item.name ?? '?')}  ${chalk.gray(item.pricing ?? '')}  ${chalk.white(item.description ?? '')}`);
             }
             console.log();
-            console.log(chalk.gray('  Try a paid call now' + (isTestnet ? ' (your account is funded)' : '') + ':'));
-            console.log(chalk.cyan(`    azeth call ${serverUrl}/api/v1/pricing/ethereum`));
-            console.log();
           }
         } else {
           catalogSpinner.stop();
         }
       } catch {
         // Non-fatal — catalog fetch failed, just skip the demo
+      }
+
+      // Step 6d: Make a live paid API call to demonstrate x402 (testnet only)
+      if (isTestnet) {
+        try {
+          const demoSpinner = ora('Making your first paid API call...').start();
+          const demoRes = await kit.fetch402(`${serverUrl}/api/v1/pricing/ethereum`);
+          demoSpinner.stop();
+          if (demoRes.response.ok) {
+            const body = await demoRes.response.json() as { data?: { symbol?: string; price?: string } };
+            const price = body?.data?.price;
+            const costStr = demoRes.amount !== undefined
+              ? `$${(Number(demoRes.amount) / 1_000_000).toFixed(2)}`
+              : '$0.01';
+            printSuccess(`First paid call complete! ETH = ${price ?? 'N/A'} (cost: ${costStr})`);
+            console.log();
+          }
+        } catch {
+          // Non-fatal — the demo call is a nice-to-have
+        }
       }
 
       console.log(chalk.gray('  Next steps:'));
@@ -209,11 +202,8 @@ export const quickstartCommand = new Command('quickstart')
 
       // Step 7: Print key persistence instructions (only for generated keys)
       if (generated) {
-        console.log(chalk.bold('  To continue using this account:'));
-        console.log(chalk.cyan(`    export AZETH_PRIVATE_KEY=${privateKey}`));
-        console.log();
-        console.log(chalk.gray('  Or add to .env:'));
-        console.log(chalk.gray(`    echo 'AZETH_PRIVATE_KEY=${privateKey}' >> .env`));
+        console.log(chalk.gray('  Key saved to ~/.azeth/key'));
+        console.log(chalk.gray('  To use in other terminals: export AZETH_PRIVATE_KEY=$(cat ~/.azeth/key)'));
         console.log();
       }
     } catch (err) {

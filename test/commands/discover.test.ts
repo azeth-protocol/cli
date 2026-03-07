@@ -44,7 +44,8 @@ describe('discover command', () => {
       .addCommand(cmd);
   }
 
-  it('displays results in a table when services are found', async () => {
+  // First dynamic import after vi.resetModules() cold-loads @azeth/common (large ABIs)
+  it('displays results in a table when services are found', { timeout: 15000 }, async () => {
     const responseData = {
       data: [
         { tokenId: '1', owner: '0x1111111111111111111111111111111111111111', entityType: 'service', name: 'PriceFeed', capabilities: ['price-feed'], active: true },

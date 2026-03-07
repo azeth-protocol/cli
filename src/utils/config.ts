@@ -1,8 +1,9 @@
 import { AzethKit, type AzethKitConfig } from '@azeth/sdk';
-import { isValidChainName, isValidPrivateKey } from '@azeth/common';
+import { isValidChainName, isValidPrivateKey, RPC_ENV_KEYS } from '@azeth/common';
 import type { SupportedChainName } from '@azeth/common';
 import type { Command } from 'commander';
 import dotenv from 'dotenv';
+import { loadKey } from './key-persistence.js';
 
 dotenv.config();
 
@@ -25,7 +26,7 @@ export function resolveOptions(cmd: Command): CliOptions {
     throw new Error(`Invalid chain "${chainRaw}". Must be one of: base, baseSepolia, ethereumSepolia, ethereum`);
   }
 
-  const rpcUrl = opts.rpcUrl ?? process.env['BASE_RPC_URL'];
+  const rpcUrl = opts.rpcUrl ?? process.env[RPC_ENV_KEYS[chainRaw]];
   const serverUrl = opts.serverUrl ?? process.env['AZETH_SERVER_URL'];
 
   // Validate server URL if provided
@@ -48,10 +49,16 @@ export function resolveOptions(cmd: Command): CliOptions {
  *  Private key is read exclusively from the AZETH_PRIVATE_KEY environment variable.
  *  NEVER pass private keys via command-line arguments (visible in shell history and process listings). */
 export async function createKit(options: CliOptions): Promise<AzethKit> {
-  const privateKey = process.env['AZETH_PRIVATE_KEY'];
+  let privateKey = process.env['AZETH_PRIVATE_KEY'];
+  if (!privateKey) {
+    const fileKey = loadKey();
+    if (fileKey) {
+      privateKey = fileKey;
+    }
+  }
   if (!privateKey) {
     throw new Error(
-      'Private key required. Set the AZETH_PRIVATE_KEY environment variable.\n' +
+      "Private key required. Set AZETH_PRIVATE_KEY or run 'azeth quickstart' to auto-generate one.\n" +
       'Example: export AZETH_PRIVATE_KEY=0x...\n' +
       'WARNING: Never pass private keys via command-line flags — they are visible in shell history.',
     );

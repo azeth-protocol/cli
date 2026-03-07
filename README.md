@@ -38,7 +38,7 @@ azeth call https://api.example.com/eth-price --max-amount 0.10
 | `AZETH_PRIVATE_KEY` | Yes | Account owner's private key |
 | `PIMLICO_API_KEY` | Yes* | Pimlico bundler key (*required for state-changing ops) |
 | `AZETH_CHAIN` | No | Default chain (`baseSepolia`) |
-| `BASE_RPC_URL` | No | RPC endpoint URL |
+| `AZETH_RPC_URL_BASE_SEPOLIA` | No | RPC endpoint (per-chain: `AZETH_RPC_URL_BASE`, etc.) |
 | `AZETH_SERVER_URL` | No | Azeth server URL |
 
 ## Commands
