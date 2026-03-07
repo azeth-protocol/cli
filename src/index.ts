@@ -1,4 +1,5 @@
 import { Command } from 'commander';
+import { quickstartCommand } from './commands/quickstart.js';
 import { initCommand } from './commands/init.js';
 import { registerCommand } from './commands/register.js';
 import { discoverCommand } from './commands/discover.js';
@@ -19,6 +20,7 @@ const program = new Command()
   .option('--server-url <url>', 'Azeth server URL (or set AZETH_SERVER_URL)');
 
 // Daily porcelain commands
+program.addCommand(quickstartCommand);
 program.addCommand(initCommand);
 program.addCommand(callCommand);
 program.addCommand(findCommand);
